@@ -28,20 +28,15 @@ pub mod token {
     #[eth_abi(TokenEndpoint, TokenClient)]
     pub trait TokenInterface {
         /// The constructor
-        // TODO: String
-        fn constructor(&mut self, _total_supply: U256, _task: U256, min_exec: U256, max_exec: U256, amount_of_block_deadline: U256);
+        fn constructor(&mut self, _total_supply: U256);
         /// Total amount of tokens
         #[constant]
         fn totalSupply(&mut self) -> U256;
+        /// What is the balance of a particular account?
         #[constant]
-        // TODO: return string
-        fn get_contract_data(&mut self) -> U256;
-        /// What is the reward for every executor?
-        fn get_current_reward(&mut self) -> U256;
-        /// Send result of calculations
-        //fn send_answer(&mut self, pwasm_std::Vec<u8>) -> bool;
+        fn balanceOf(&mut self, _owner: Address) -> U256;
         /// Transfer the balance from owner's account to another account
-        fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool;
+        fn transfer(&mut self, _to: Address, _amount: U256) -> bool;
         /// Event declaration
         #[event]
         fn Transfer(&mut self, indexed_from: Address, indexed_to: Address, _value: U256);
@@ -50,63 +45,40 @@ pub mod token {
     pub struct TokenContract;
 
     impl TokenInterface for TokenContract {
-        fn constructor(&mut self, _total_supply: U256, _task: U256, min_exec: U256, max_exec: U256, amount_of_block_deadline: U256)
-        {}
-
-        fn totalSupply(&mut self) -> U256{
-            U256::max_value()
+        fn constructor(&mut self, total_supply: U256) {
+            let sender = pwasm_ethereum::sender();
+            // Set up the total supply for the token
+            pwasm_ethereum::write(&TOTAL_SUPPLY_KEY, &total_supply.into());
+            // Give all tokens to the contract owner
+            pwasm_ethereum::write(&balance_key(&sender), &total_supply.into());
+            // Set the contract owner
+            pwasm_ethereum::write(&OWNER_KEY, &H256::from(sender).into());
         }
 
-        fn get_contract_data(&mut self) -> U256 {
-            U256::max_value()
+        fn totalSupply(&mut self) -> U256 {
+            U256::from_big_endian(&pwasm_ethereum::read(&TOTAL_SUPPLY_KEY))
         }
-        
-        fn get_current_reward(&mut self) -> U256 {
-            U256::max_value()
+
+        fn balanceOf(&mut self, owner: Address) -> U256 {
+            read_balance_of(&owner)
         }
-        /// Send result of calculations
-        //fn send_answer(&mut self, pwasm_std::Vec<u8>) -> bool;
-         
-        fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool{
-            true
+
+        fn transfer(&mut self, to: Address, amount: U256) -> bool {
+            let sender = pwasm_ethereum::sender();
+            let senderBalance = read_balance_of(&sender);
+            let recipientBalance = read_balance_of(&to);
+            if amount == 0.into() || senderBalance < amount || to == sender {
+                false
+            } else {
+                let new_sender_balance = senderBalance - amount;
+                let new_recipient_balance = recipientBalance + amount;
+                pwasm_ethereum::write(&balance_key(&sender), &new_sender_balance.into());
+                pwasm_ethereum::write(&balance_key(&to), &new_recipient_balance.into());
+                self.Transfer(sender, to, amount);
+                true
+            }
         }
     }
-
-    //impl TokenInterface for TokenContract {
-    //    fn constructor(&mut self, total_supply: U256) {
-    //        let sender = pwasm_ethereum::sender();
-    //        // Set up the total supply for the token
-    //        pwasm_ethereum::write(&TOTAL_SUPPLY_KEY, &total_supply.into());
-    //        // Give all tokens to the contract owner
-    //        pwasm_ethereum::write(&balance_key(&sender), &total_supply.into());
-    //        // Set the contract owner
-    //        pwasm_ethereum::write(&OWNER_KEY, &H256::from(sender).into());
-    //    }
-
-    //    fn totalSupply(&mut self) -> U256 {
-    //        U256::from_big_endian(&pwasm_ethereum::read(&TOTAL_SUPPLY_KEY))
-    //    }
-
-    //    fn balanceOf(&mut self, owner: Address) -> U256 {
-    //        read_balance_of(&owner)
-    //    }
-
-    //    fn transfer(&mut self, to: Address, amount: U256) -> bool {
-    //        let sender = pwasm_ethereum::sender();
-    //        let senderBalance = read_balance_of(&sender);
-    //        let recipientBalance = read_balance_of(&to);
-    //        if amount == 0.into() || senderBalance < amount || to == sender {
-    //            false
-    //        } else {
-    //            let new_sender_balance = senderBalance - amount;
-    //            let new_recipient_balance = recipientBalance + amount;
-    //            pwasm_ethereum::write(&balance_key(&sender), &new_sender_balance.into());
-    //            pwasm_ethereum::write(&balance_key(&to), &new_recipient_balance.into());
-    //            self.Transfer(sender, to, amount);
-    //            true
-    //        }
-    //    }
-    //}
 
     // Reads balance by address
     fn read_balance_of(owner: &Address) -> U256 {
@@ -180,10 +152,3 @@ mod tests {
     }
 
 }
-
-
-// Что вообще нужно чувакам, использующим контракт? А вот что:
-//1. Автор деплоит контракт;
-//2. Указывает исходные данные (где взять задание, сумма оплаты, количество денег на контракте, максимальное количество исполнителей, когда дедлайн);
-//3. Исполнитель должен взять задание;
-//4. Исполнитель должен вернуть результат задания и получить деньги;

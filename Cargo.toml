@@ -1,7 +1,7 @@
 [package]
-name = "pwasm-tutorial-contract"
+name = "sc_sdcita"
 version = "0.1.0"
-authors = ["Alexey Frolov <alexey@parity.io>"]
+authors = ["Sapunov Anton"]
 
 [dependencies]
 pwasm-std = "0.13"
