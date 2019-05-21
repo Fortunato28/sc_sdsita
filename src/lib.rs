@@ -23,23 +23,37 @@ pub mod token {
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
             );
+        static ref LINK_TO_TASK: H256 =
+            H256::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
+        static ref MINIMUM_EXEC: H256 =
+            H256::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
+        static ref MAXIMUM_EXEC: H256 =
+            H256::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
+        static ref BLOCKS_ANOUNT_DEADLINE: H256 =
+            H256::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
     }
 
     #[eth_abi(TokenEndpoint, TokenClient)]
     pub trait TokenInterface {
         /// The constructor
-        // TODO: String
-        fn constructor(&mut self, _total_supply: U256, _task: U256, min_exec: U256, max_exec: U256, amount_of_block_deadline: U256);
+        fn constructor(&mut self, _total_supply: U256, _task: H256, min_exec: H256, max_exec: H256, amount_of_block_deadline: H256);
         /// Total amount of tokens
         #[constant]
-        fn totalSupply(&mut self) -> U256;
+        fn get_link_to_task(&mut self) -> H256;
         #[constant]
-        // TODO: return string
-        fn get_contract_data(&mut self) -> U256;
-        /// What is the reward for every executor?
-        fn get_current_reward(&mut self) -> U256;
+        fn get_number_of_blocks_before_deadline(&mut self) -> H256;
+        /// What is the reward for each executor?
+        fn get_current_reward(&mut self) -> H256;
         /// Send result of calculations
-        //fn send_answer(&mut self, pwasm_std::Vec<u8>) -> bool;
+        fn send_answer(&mut self, answer :pwasm_std::Vec<u8> ) -> bool;
         /// Transfer the balance from owner's account to another account
         fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool;
         /// Event declaration
@@ -50,22 +64,38 @@ pub mod token {
     pub struct TokenContract;
 
     impl TokenInterface for TokenContract {
-        fn constructor(&mut self, _total_supply: U256, _task: U256, min_exec: U256, max_exec: U256, amount_of_block_deadline: U256)
-        {}
-
-        fn totalSupply(&mut self) -> U256{
-            U256::max_value()
+        fn constructor(&mut self, total_supply: U256, _task: H256, min_exec: H256, max_exec: H256, amount_of_block_deadline: H256)
+        {
+            let sender = pwasm_ethereum::sender();
+            // Set up the full reward about task
+            pwasm_ethereum::write(&TOTAL_SUPPLY_KEY, &total_supply.into());
+            // Give all money to the contract deployer
+            pwasm_ethereum::write(&balance_key(&sender), &total_supply.into());
+            // Set the contract owner
+            pwasm_ethereum::write(&OWNER_KEY, &H256::from(sender).into());
+            // Set link to task
+            pwasm_ethereum::write(&LINK_TO_TASK, &H256::from(_task).into());
+            // Set minimum amount of executors
+            pwasm_ethereum::write(&MINIMUM_EXEC, &H256::from(min_exec).into());
+            // Set maximum amount of executors
+            pwasm_ethereum::write(&MAXIMUM_EXEC, &H256::from(max_exec).into());
         }
 
-        fn get_contract_data(&mut self) -> U256 {
-            U256::max_value()
+        fn get_link_to_task(&mut self) -> H256 {
+            H256::zero()
+        }
+
+        fn get_number_of_blocks_before_deadline(&mut self) -> H256 {
+            H256::zero()
+        }
+
+        fn send_answer(&mut self, answer :pwasm_std::Vec<u8> ) -> bool{
+            true
         }
         
-        fn get_current_reward(&mut self) -> U256 {
-            U256::max_value()
+        fn get_current_reward(&mut self) -> H256 {
+            H256::zero()
         }
-        /// Send result of calculations
-        //fn send_answer(&mut self, pwasm_std::Vec<u8>) -> bool;
          
         fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool{
             true
