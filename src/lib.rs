@@ -35,6 +35,10 @@ pub mod token {
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
             );
+        static ref CURRENT_EXEC: H256 =
+            H256::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
         static ref BLOCKS_ANOUNT_DEADLINE: H256 =
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -47,7 +51,7 @@ pub mod token {
         fn constructor(&mut self, _total_supply: U256, _task: H256, min_exec: H256, max_exec: H256, amount_of_block_deadline: H256);
         /// Total amount of tokens
         #[constant]
-        fn get_link_to_task(&mut self) -> H256;
+        fn get_task(&mut self) -> H256;
         #[constant]
         fn get_number_of_blocks_before_deadline(&mut self) -> H256;
         /// What is the reward for each executor?
@@ -64,7 +68,7 @@ pub mod token {
     pub struct TokenContract;
 
     impl TokenInterface for TokenContract {
-        fn constructor(&mut self, total_supply: U256, _task: H256, min_exec: H256, max_exec: H256, amount_of_block_deadline: H256)
+        fn constructor(&mut self, total_supply: U256, _task: H256, min_exec: H256, max_exec: H256, nums_block_deadline: H256)
         {
             let sender = pwasm_ethereum::sender();
             // Set up the full reward about task
@@ -79,13 +83,23 @@ pub mod token {
             pwasm_ethereum::write(&MINIMUM_EXEC, &H256::from(min_exec).into());
             // Set maximum amount of executors
             pwasm_ethereum::write(&MAXIMUM_EXEC, &H256::from(max_exec).into());
+            // Set current amount of executors
+            pwasm_ethereum::write(&MAXIMUM_EXEC, &H256::zero().into());
+            // Set maximum amount of executors
+            pwasm_ethereum::write(&BLOCKS_ANOUNT_DEADLINE, &H256::from(nums_block_deadline).into());
         }
 
-        fn get_link_to_task(&mut self) -> H256 {
-            H256::zero()
+        fn get_task(&mut self) -> H256 {
+            let current_exec = U256::from_big_endian(&pwasm_ethereum::read(&CURRENT_EXEC)) + U256::one();
+            pwasm_ethereum::write(&CURRENT_EXEC, &current_exec.into());
+            pwasm_ethereum::read(&LINK_TO_TASK).into()
         }
 
         fn get_number_of_blocks_before_deadline(&mut self) -> H256 {
+            pwasm_ethereum::read(&BLOCKS_ANOUNT_DEADLINE).into()
+        }
+
+        fn get_current_reward(&mut self) -> H256 {
             H256::zero()
         }
 
@@ -93,10 +107,6 @@ pub mod token {
             true
         }
         
-        fn get_current_reward(&mut self) -> H256 {
-            H256::zero()
-        }
-         
         fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool{
             true
         }
