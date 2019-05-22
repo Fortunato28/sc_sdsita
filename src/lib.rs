@@ -39,10 +39,17 @@ pub mod token {
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
             );
+        static ref AMOUNT_OF_ANSWERS: H256 =
+            H256::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
         static ref BLOCKS_ANOUNT_DEADLINE: H256 =
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
             );
+
+        static ref ANSWERS: pwasm_std::Vec<Vec<u8>> = Vec::new();
+        static ref TEST: [H256; 500] = [H256::zero(); 500];
     }
 
     #[eth_abi(TokenEndpoint, TokenClient)]
@@ -57,7 +64,7 @@ pub mod token {
         /// What is the reward for each executor?
         fn get_current_reward(&mut self) -> H256;
         /// Send result of calculations
-        fn send_answer(&mut self, answer :pwasm_std::Vec<u8> ) -> bool;
+        fn send_answer(&mut self, answer: U256) -> bool;
         /// Transfer the balance from owner's account to another account
         fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool;
         /// Event declaration
@@ -90,6 +97,7 @@ pub mod token {
         }
 
         fn get_task(&mut self) -> H256 {
+            // Increment amount of executors
             let current_exec = U256::from_big_endian(&pwasm_ethereum::read(&CURRENT_EXEC)) + U256::one();
             pwasm_ethereum::write(&CURRENT_EXEC, &current_exec.into());
             pwasm_ethereum::read(&LINK_TO_TASK).into()
@@ -99,15 +107,19 @@ pub mod token {
             pwasm_ethereum::read(&BLOCKS_ANOUNT_DEADLINE).into()
         }
 
+        // TODO implement
         fn get_current_reward(&mut self) -> H256 {
             H256::zero()
         }
 
-        fn send_answer(&mut self, answer :pwasm_std::Vec<u8> ) -> bool{
+        fn send_answer(&mut self, answer: U256) -> bool {
+            let answers_amount = U256::from_big_endian(&pwasm_ethereum::read(&AMOUNT_OF_ANSWERS)) + U256::one();
+            pwasm_ethereum::write(&AMOUNT_OF_ANSWERS, &answers_amount.into());
+            pwasm_ethereum::write(&TEST[answers_amount.as_usize()], &answer.into());
             true
         }
         
-        fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool{
+        fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool {
             true
         }
     }
