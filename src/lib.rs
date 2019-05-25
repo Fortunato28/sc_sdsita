@@ -108,8 +108,11 @@ pub mod token {
         }
 
         // TODO implement
+        // Получение текущей награды за выполнение задания, алгоритм:
         fn get_current_reward(&mut self) -> H256 {
-            H256::zero()
+            let contract_balance = U256::from_big_endian(&pwasm_ethereum::read(&TOTAL_SUPPLY_KEY));
+            let current_exec = U256::from_big_endian(&pwasm_ethereum::read(&CURRENT_EXEC));
+            (contract_balance / current_exec).into()
         }
 
         fn send_answer(&mut self, answer: U256) -> bool {
