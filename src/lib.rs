@@ -23,6 +23,10 @@ pub mod token {
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
             );
+        static ref OWNER_ADDRESS: H160 =
+            H160::from(
+                [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+            );
         static ref LINK_TO_TASK: H256 =
             H256::from(
                 [3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
@@ -66,7 +70,7 @@ pub mod token {
         /// Send result of calculations
         fn send_answer(&mut self, answer: U256) -> bool;
         /// Transfer the balance from owner's account to another account
-        fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool;
+        fn transfer_reward(&mut self, to: Address, _amount: U256) -> bool;
         /// Event declaration
         #[event]
         fn Transfer(&mut self, indexed_from: Address, indexed_to: Address, _value: U256);
@@ -107,8 +111,6 @@ pub mod token {
             pwasm_ethereum::read(&BLOCKS_ANOUNT_DEADLINE).into()
         }
 
-        // TODO implement
-        // Получение текущей награды за выполнение задания, алгоритм:
         fn get_current_reward(&mut self) -> H256 {
             let contract_balance = U256::from_big_endian(&pwasm_ethereum::read(&TOTAL_SUPPLY_KEY));
             let current_exec = U256::from_big_endian(&pwasm_ethereum::read(&CURRENT_EXEC));
@@ -122,46 +124,37 @@ pub mod token {
             true
         }
         
-        fn transfer_reward(&mut self, _to: Address, _amount: U256) -> bool {
+        fn transfer_reward(&mut self, to: Address, amount: U256) -> bool {
+            let owner_address = H160::from([3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
+            // Execute only if contracts owner calls
+            if pwasm_ethereum::sender() == owner_address {
+
+                // For each executors
+                let current_exec = U256::from_big_endian(&pwasm_ethereum::read(&CURRENT_EXEC)).as_usize();
+                // TODO fix it with real iterations other the executors addresses
+                for _executor in 1..current_exec {
+
+                    // This is contract address itself
+                    let contract_address = pwasm_ethereum::address();
+                    let contract_balance = pwasm_ethereum::balance(&contract_address);
+                    let recipientBalance = read_balance_of(&to);
+                    
+                    if amount == 0.into() || contract_balance < amount || to == contract_address {
+                        return false;
+                    } else {
+                        let new_contract_balance = contract_balance - amount;
+                        let new_recipient_balance = recipientBalance + amount;
+                        pwasm_ethereum::write(&balance_key(&contract_address), &new_contract_balance.into());
+                        pwasm_ethereum::write(&balance_key(&to), &new_recipient_balance.into());
+                        self.Transfer(contract_address, to, amount);
+                    }
+                }
             true
+            } else {
+                false
+            }
         }
     }
-
-    //impl TokenInterface for TokenContract {
-    //    fn constructor(&mut self, total_supply: U256) {
-    //        let sender = pwasm_ethereum::sender();
-    //        // Set up the total supply for the token
-    //        pwasm_ethereum::write(&TOTAL_SUPPLY_KEY, &total_supply.into());
-    //        // Give all tokens to the contract owner
-    //        pwasm_ethereum::write(&balance_key(&sender), &total_supply.into());
-    //        // Set the contract owner
-    //        pwasm_ethereum::write(&OWNER_KEY, &H256::from(sender).into());
-    //    }
-
-    //    fn totalSupply(&mut self) -> U256 {
-    //        U256::from_big_endian(&pwasm_ethereum::read(&TOTAL_SUPPLY_KEY))
-    //    }
-
-    //    fn balanceOf(&mut self, owner: Address) -> U256 {
-    //        read_balance_of(&owner)
-    //    }
-
-    //    fn transfer(&mut self, to: Address, amount: U256) -> bool {
-    //        let sender = pwasm_ethereum::sender();
-    //        let senderBalance = read_balance_of(&sender);
-    //        let recipientBalance = read_balance_of(&to);
-    //        if amount == 0.into() || senderBalance < amount || to == sender {
-    //            false
-    //        } else {
-    //            let new_sender_balance = senderBalance - amount;
-    //            let new_recipient_balance = recipientBalance + amount;
-    //            pwasm_ethereum::write(&balance_key(&sender), &new_sender_balance.into());
-    //            pwasm_ethereum::write(&balance_key(&to), &new_recipient_balance.into());
-    //            self.Transfer(sender, to, amount);
-    //            true
-    //        }
-    //    }
-    //}
 
     // Reads balance by address
     fn read_balance_of(owner: &Address) -> U256 {
@@ -192,6 +185,7 @@ pub fn deploy() {
     endpoint.dispatch_ctor(&pwasm_ethereum::input());
 }
 
+// TODO fix this tests, do it usefull
 #[cfg(test)]
 #[allow(non_snake_case)]
 mod tests {
